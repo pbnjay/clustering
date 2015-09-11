@@ -6,9 +6,10 @@ import "math"
 // purposes, it should be comparable / suitable as a map key.
 type ClusterItem interface{}
 
-// ClusterSet is implemented by the user to allow generic clustering methods.
-// Clusters and Items within them are identified by simple integers, and paired
-// item distances are computed by the user code as well.
+// ClusterSet is implemented by the user to allow generic clustering data
+// sources. Clusters are identified by simple integers, and items within
+// clusters are identified by the generic ClusterItem interface. Paired item
+// distances are computed by the user code as well.
 type ClusterSet interface {
 	// Count returns the number of clusters in the set.
 	Count() int
