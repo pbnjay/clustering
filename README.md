@@ -1,25 +1,25 @@
-# hclust
-Hierarchical clustering algorithm implementations for Go. Quickly/easily cluster your data without leaving your own code.
+# clustering
+Some basic clustering algorithm implementations for Go.
 
-[![GoDoc](https://godoc.org/github.com/pbnjay/hclust?status.svg)](https://godoc.org/github.com/pbnjay/hclust)
+[![GoDoc](https://godoc.org/github.com/pbnjay/clustering?status.svg)](https://godoc.org/github.com/pbnjay/clustering)
 
 # Quick Start
 To cluster a simple set of data using a map of maps to distances, and
-complete-linkage clustering with a simple threshold cutoff, the following
-code suffices:
+complete-linkage hierarchical clustering with a simple threshold cutoff, the
+following code suffices:
 
     // NB map can be asymmetric like this, both key orderings are checked if necessary
-    clusters := hclust.NewDistanceMapClusterSet(hclust.DistanceMap{
+    clusters := clustering.NewDistanceMapClusterSet(clustering.DistanceMap{
       "a": {"b": 0.0, "c": 0.0, "d": 1.0, "e": 0.4},
       "b": {"c": 0.1, "d": 0.9, "e": 0.4},
       "c": {"d": 0.9, "e": 0.2},
       "d": {"e": 0.1},
     })
-    hclust.Cluster(clusters, hclust.Threshold(0.4), hclust.CompleteLinkage())
+    clustering.Cluster(clusters, clustering.Threshold(0.4), clustering.CompleteLinkage())
 
     // Enumerate clusters and print members
     clusters.EachCluster(-1, func(cluster int) {
-      clusters.EachItem(cluster, func(x hclust.ClusterItem) {
+      clusters.EachItem(cluster, func(x clustering.ClusterItem) {
         fmt.Println(cluster, x)
       }
     }
@@ -34,9 +34,9 @@ code suffices:
 
 # Supported Data sources
 
-I highly recommend implementing the [`ClusterSet` interface](http://godoc.org/github.com/pbnjay/hclust#ClusterSet) to work with your existing data, it will be much more efficient and give you better tools to tweak things. For smaller data sets, using the included [`DistanceMap`](http://godoc.org/github.com/pbnjay/hclust#DistanceMap) is probably good enough for most purposes.
+I highly recommend implementing the [`ClusterSet` interface](http://godoc.org/github.com/pbnjay/clustering#ClusterSet) to work with your existing data, it will be much more efficient and give you better tools to tweak things. For smaller data sets, using the included [`DistanceMap`](http://godoc.org/github.com/pbnjay/clustering#DistanceMap) is probably good enough for most purposes.
 
-# Supported Linkage methods
+# Supported Hierarchical Clustering Linkage methods
 
 * **Complete Linkage (Maximum Linkage)** - Uses the maximum distance between any 2 items in the 2 clusters as the cluster-pair's linkage score. i.e. the 2 clusters with the smallest distance between the *furthest* two items are selected.
 

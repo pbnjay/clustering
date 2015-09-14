@@ -1,4 +1,4 @@
-package hclust
+package clustering
 
 // DistanceMap is a map of maps from cluster items (pairs) to the distance
 // measures between them. A distance map does not have to be symmetric, but it

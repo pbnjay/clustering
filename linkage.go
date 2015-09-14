@@ -1,4 +1,4 @@
-package hclust
+package clustering
 
 // LinkageType is an interface that defines how two clusters are scored
 // based on the pairwise distances of their items.
