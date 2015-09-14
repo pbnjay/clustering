@@ -69,7 +69,7 @@ func (d *distMapClusterSet) Count() int {
 	return len(d.clusters)
 }
 
-func (d *distMapClusterSet) Merge(i, j int) {
+func (d *distMapClusterSet) Merge(i, j int) (keep, swappedIn int) {
 	if j < i {
 		j, i = i, j
 	}
@@ -82,4 +82,5 @@ func (d *distMapClusterSet) Merge(i, j int) {
 	}
 	d.clusters[i] = append(d.clusters[i], d.clusters[j]...)
 	d.clusters = d.clusters[:j]
+	return i, x
 }

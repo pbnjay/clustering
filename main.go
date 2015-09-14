@@ -25,8 +25,10 @@ type ClusterSet interface {
 	Distance(c1, c2 int, item1, item2 ClusterItem) float64
 
 	// Merge the two clusters together. After this step Count() should be
-	// reduced by 1.
-	Merge(cluster1, cluster2 int)
+	// reduced by 1. Retuns the cluster that is merged into (kept) and the
+	// cluster that is swapped into the place of the merged cluster (typically
+	// the last cluster).
+	Merge(cluster1, cluster2 int) (kept, swappedIn int)
 }
 
 // OptimizedClusterSet allows implementors to optimize distance calculations by
