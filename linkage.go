@@ -12,6 +12,11 @@ type LinkageType interface {
 	// Get returns the current value of the linkage based on all the observed
 	// values so far.
 	Get() float64
+
+	// LWParams returns the lance-williams parameters for updating clusters
+	// after a merge. Return (alpha_i, alpha_j, Beta, gamma), if return value
+	// is not 4 floats, then clustering falls back to recomputing at each pass.
+	LWParams() []float64
 }
 
 // CompleteLinkage implements complete-linkage clustering, which is defined as
@@ -31,6 +36,14 @@ func SingleLinkage() LinkageType {
 // pairs of items in the two clusters.
 func AverageLinkage() LinkageType {
 	return &avgLinkage{}
+}
+
+// WeightedAverageLinkage implements WPGMA linkage agglomeration method
+// clustering, which is defined as the average of all distances between pairs
+// of items in the two clusters. It weights clusters equally regardless of
+// number of items.
+func WeightedAverageLinkage() LinkageType {
+	return &avgLinkage{isWeighted: true}
 }
 
 ////////////////
@@ -53,6 +66,10 @@ func (c *maxLinkage) Put(a, b ClusterItem, dist float64) {
 	}
 }
 
+func (c *maxLinkage) LWParams() []float64 {
+	return []float64{0.5, 0.5, 0.0, 0.5}
+}
+
 ////////////////
 
 type minLinkage struct {
@@ -73,16 +90,28 @@ func (c *minLinkage) Put(a, b ClusterItem, dist float64) {
 	}
 }
 
+func (c *minLinkage) LWParams() []float64 {
+	return []float64{0.5, 0.5, 0.0, -0.5}
+}
+
 ////////////////
 
 type avgLinkage struct {
 	avgDist    float64
 	totalPairs float64
+
+	isWeighted  bool
+	leftCounts  map[ClusterItem]struct{}
+	rightCounts map[ClusterItem]struct{}
 }
 
 func (c *avgLinkage) Reset() {
 	c.avgDist = 0.0
 	c.totalPairs = 0.0
+	if !c.isWeighted {
+		c.leftCounts = make(map[ClusterItem]struct{})
+		c.rightCounts = make(map[ClusterItem]struct{})
+	}
 }
 
 func (c *avgLinkage) Get() float64 {
@@ -95,4 +124,17 @@ func (c *avgLinkage) Get() float64 {
 func (c *avgLinkage) Put(a, b ClusterItem, dist float64) {
 	c.avgDist += dist
 	c.totalPairs++
+	if !c.isWeighted {
+		c.leftCounts[a] = struct{}{}
+		c.rightCounts[b] = struct{}{}
+	}
+}
+
+func (c *avgLinkage) LWParams() []float64 {
+	if c.isWeighted {
+		return []float64{0.5, 0.5, 0.0, 0.0}
+	}
+	ni := float64(len(c.leftCounts))
+	nj := float64(len(c.rightCounts))
+	return []float64{ni / (ni + nj), nj / (ni + nj), 0.0, 0.0}
 }
