@@ -73,6 +73,9 @@ type HClustering struct {
 
 	// ClusterSet is used to enumerate and manipulate the set of clusters.
 	ClusterSet ClusterSet
+
+	lwCache   []float64
+	distCache map[int]map[int]float64
 }
 
 //////////////////
@@ -93,6 +96,116 @@ func Cluster(c ClusterSet, chk Checker, lt LinkageType) {
 	}
 }
 
+// calculate the distance between cluster i and cluster j.
+// also caches and reuses prior calculations
+func (h *HClustering) dist(i, j int) float64 {
+	if h.distCache != nil {
+		if i > j {
+			i, j = j, i
+		}
+		if _, f := h.distCache[i]; f {
+			if s, f2 := h.distCache[i][j]; f2 {
+				return s
+			}
+		} else {
+			// prep for saving to cache
+			h.distCache[i] = make(map[int]float64)
+		}
+	}
+	h.LinkageType.Reset()
+
+	ocs, ok := h.ClusterSet.(OptimizedClusterSet)
+	if !ok {
+		ocs = &defaultOptimizedClusterSet{cs: h.ClusterSet}
+	}
+
+	h.ClusterSet.EachItem(i, func(a ClusterItem) {
+		ocs.EachItemDistance(i, j, a, func(b ClusterItem, dist float64) {
+			h.LinkageType.Put(a, b, dist)
+		})
+	})
+
+	s := h.LinkageType.Get()
+	if h.distCache != nil {
+		h.distCache[i][j] = s
+	}
+	return s
+}
+
+// merges clusters i and j, and calculates the new distances resulting from it.
+// 1) call ClusterSet.Merge(i,j)
+// 2) remove cluster r=ClusterSet.Count() from distance cache
+// 3) for each cluster x:
+// 3a) update distances for (i,j) and remove r
+func (h *HClustering) mergeAndUpdateAll(i, j int) {
+	nc := h.ClusterSet.Count()
+
+	diks := []float64{}
+	djks := []float64{}
+	for k := 0; k < nc; k++ {
+		diks = append(diks, h.dist(i, k))
+		djks = append(djks, h.dist(j, k))
+	}
+
+	origDist := diks[j]
+	ni, nj := h.ClusterSet.Merge(i, j)
+
+	if nj != j {
+		// where did nj go to?
+		r := j
+		if ni == j {
+			r = i
+		}
+
+		//move cached distances from nj into r
+		for k := 0; k < nc; k++ {
+			if k == nj {
+				continue
+			}
+			x1, y1 := k, r
+			if x1 > y1 {
+				x1, y1 = r, k
+			}
+
+			x2, y2 := k, nj
+			if x2 > y2 {
+				x2, y2 = nj, k
+			}
+			h.distCache[x1][y1] = h.distCache[x2][y2]
+		}
+
+		// now remove unused cache values
+		for k := 0; k < nc; k++ {
+			if k == nj {
+				delete(h.distCache, nj)
+				continue
+			}
+			if _, f := h.distCache[k]; f {
+				delete(h.distCache[k], nj)
+			}
+		}
+	}
+
+	// apply lance-williams update method to all affected pairs
+	nc--
+	for k := 0; k < nc; k++ {
+		dik := diks[k]
+		djk := djks[k]
+		dd := dik - djk
+		if dd < 0.0 {
+			dd = -dd
+		}
+
+		d := h.lwCache[0]*dik + h.lwCache[1]*djk + h.lwCache[2]*origDist + h.lwCache[3]*dd
+		if ni < k {
+			h.distCache[ni][k] = d
+		} else {
+			h.distCache[k][ni] = d
+		}
+	}
+
+}
+
 // MergeNext finds the next pair of clusters to merge by applying the linkage
 // method to all pairs and selecting the best result. It then verifies criteria
 // are met before merging them. It returns true if the pair of clusters was
@@ -101,24 +214,14 @@ func (h *HClustering) MergeNext() bool {
 	bestScore := math.MaxFloat64
 	var bestPair []int
 
-	ocs, ok := h.ClusterSet.(OptimizedClusterSet)
-	if !ok {
-		ocs = &defaultOptimizedClusterSet{cs: h.ClusterSet}
+	if len(h.lwCache) != 4 {
+		h.lwCache = h.LinkageType.LWParams()
+		h.distCache = make(map[int]map[int]float64)
 	}
 
-	// TODO: memoize pair scores so we only update what changed
-	// instead of re-calculating everything every time
 	h.ClusterSet.EachCluster(-1, func(c1 int) {
 		h.ClusterSet.EachCluster(c1, func(c2 int) {
-			h.LinkageType.Reset()
-
-			h.ClusterSet.EachItem(c1, func(a ClusterItem) {
-				ocs.EachItemDistance(c1, c2, a, func(b ClusterItem, dist float64) {
-					h.LinkageType.Put(a, b, dist)
-				})
-			})
-
-			score := h.LinkageType.Get()
+			score := h.dist(c1, c2)
 			if score < bestScore {
 				bestScore = score
 				bestPair = []int{c1, c2}
@@ -134,6 +237,10 @@ func (h *HClustering) MergeNext() bool {
 		return false
 	}
 
-	h.ClusterSet.Merge(bestPair[0], bestPair[1])
+	if h.distCache == nil {
+		h.ClusterSet.Merge(bestPair[0], bestPair[1])
+	} else {
+		h.mergeAndUpdateAll(bestPair[0], bestPair[1])
+	}
 	return true
 }
