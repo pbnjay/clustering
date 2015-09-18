@@ -216,7 +216,7 @@ func (h *HClustering) MergeNext() bool {
 
 	if len(h.lwCache) != 4 {
 		h.lwCache = h.LinkageType.LWParams()
-		h.distCache = make(map[int]map[int]float64)
+		//h.distCache = make(map[int]map[int]float64)
 	}
 
 	h.ClusterSet.EachCluster(-1, func(c1 int) {
